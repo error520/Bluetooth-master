@@ -14,6 +14,7 @@ import android.widget.*;
 import android.view.*;
 import android.content.Context;
 
+//这是一个带ui界面的分支!
 public class MainActivity extends AppCompatActivity {
     public static final int MESSAGE_STATE_CHANGE = 1;
     public static final int MESSAGE_READ = 2;
