@@ -313,7 +313,7 @@ public class BLEService extends Service {
     }
 
     //读取数据
-    private void readData(String data){
+    public void readData(String data){
             int numA = Integer.parseInt(data, 16);
             int numB = Integer.parseInt(data, 16);
             byte dataA[] = util.intToByte2(numA);
@@ -336,9 +336,9 @@ public class BLEService extends Service {
 
     }
     //发送数据
-    private void writeData(String data){
-            int numA = Integer.parseInt(data, 16);
-            int numB = Integer.parseInt(data, 16);
+    public void writeData(String data1,String data2){
+            int numA = Integer.parseInt(data1, 16);
+            int numB = Integer.parseInt(data2, 16);
             byte dataA[] = util.intToByte2(numA);
             byte dataB[] = util.intToByte2(numB);
             byte CRC[] = new byte[2];

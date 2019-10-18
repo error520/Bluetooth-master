@@ -58,6 +58,7 @@ public class ChatActivity extends AppCompatActivity implements View.OnClickListe
         mBluetoothAdapter = bluetoothManager.getAdapter();
         Intent BLEIntent = new Intent(this, BLEService.class);
         bindService(BLEIntent,connection,BIND_AUTO_CREATE);
+        Log.d(TAG,"fuck");
         //Log.d("BLEService",mBluetoothLeService.toString());
         //mBluetoothLeService.connect(getIntent().getStringExtra("device_address"));
 
@@ -78,8 +79,7 @@ public class ChatActivity extends AppCompatActivity implements View.OnClickListe
                 readData();
                 break;
             case R.id.btWrite:
-                //writeData();
-
+                writeData();
                 Log.d(TAG,"点击了写按钮!");
                 break;
             case R.id.btClear:
@@ -296,25 +296,7 @@ public class ChatActivity extends AppCompatActivity implements View.OnClickListe
             toast.setGravity(Gravity.CENTER,0,0);
             toast.show();
         } else {
-            int numA = Integer.parseInt(Register.getText().toString(), 16);
-            int numB = Integer.parseInt(data.getText().toString(), 16);
-            byte dataA[] = util.intToByte2(numA);
-            byte dataB[] = util.intToByte2(numB);
-            byte CRC[] = new byte[2];
-            byte[] send = {0X05, 0X06, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00};
-            send[2] = dataA[0];
-            send[3] = dataA[1];
-            send[4] = dataB[0];
-            send[5] = dataB[1];
-            CRC = util.CRC16_Check(send, 6);
-            send[6] = CRC[0];
-            send[7] = CRC[1];
-            try {
-                writeCharacteristic.setValue(send);
-                mBluetoothGatt.writeCharacteristic(writeCharacteristic);
-            } catch (Exception e) {
-                Log.d("data", e.toString());
-            }
+             mBluetoothLeService.writeData(Register.getText().toString(),data.getText().toString());
         }
     }
 
