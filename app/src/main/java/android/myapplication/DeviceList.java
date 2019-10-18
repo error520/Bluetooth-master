@@ -58,6 +58,7 @@ public class DeviceList extends AppCompatActivity{
     private IntentFilter filter = new IntentFilter();
     private ProgressBar progressBar;
     private Button scanButton;
+    private Button BLEScan;
     private boolean mScanning;//是否正在搜索
     private Handler mHandler;
     private TextView count;
@@ -74,6 +75,17 @@ public class DeviceList extends AppCompatActivity{
         setResult(Activity.RESULT_CANCELED);
         progressBar = (ProgressBar)findViewById(R.id.processbar);
         scanButton=(Button)findViewById(R.id.button_scan);
+        BLEScan=(Button)findViewById(R.id.BLEscan);
+        BLEScan.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mBluetoothLeService.scanLeDevice(true);
+                device_list.clear();
+                mNewDevicesArrayAdapter.notifyDataSetChanged();
+                BLEScan.setVisibility(View.GONE);
+                progressBar.setVisibility(View.VISIBLE);
+            }
+        });
         scanButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -84,13 +96,9 @@ public class DeviceList extends AppCompatActivity{
                         Log.d(TAG,"点击了按钮");
                         scanButton.setVisibility(View.GONE);
                         progressBar.setVisibility(View.VISIBLE);
-                        //mBLE.sendBroadcast();
-                        mBluetoothLeService.scanLeDevice(true);
-                        //scanLeDevice(true);
+                        //mBluetoothLeService.scanLeDevice(true);
                     }
-
                 });
-
             }
         });
         mPairedDevicesArrayAdapter=new ArrayAdapter<String>(this,
@@ -113,53 +121,30 @@ public class DeviceList extends AppCompatActivity{
         initUI();
         Intent BLEIntent = new Intent(this,BLEService.class);
         bindService(BLEIntent,connection,BIND_AUTO_CREATE);
+     //   startService(BLEIntent);
         mHandler = new Handler();
-        filter.addAction(BluetoothDevice.ACTION_FOUND);
-//        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
-        filter.addAction("send a local broadcast");
         localReceiver = new LocalReceiver();
-        //this.registerReceiver(mReceiver,filter);
         localBroadcastManager = LocalBroadcastManager.getInstance(this);
-        localBroadcastManager.registerReceiver(localReceiver,filter);
-        final BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-        mBtAdapter = bluetoothManager.getAdapter();
-        //检查手机是否支持BLE
-        if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
-            Toast.makeText(this, "您的设备不支持蓝牙BLE，将关闭", Toast.LENGTH_SHORT).show();
-            finish();
-        }
-        if (mBtAdapter == null || !mBtAdapter.isEnabled()) {
-//            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-//            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
-            mBtAdapter.enable();
-        }
-        openGPS(this);
-        //getBlePermissionFromSys();
-        Set<BluetoothDevice>pairedDevices=mBtAdapter.getBondedDevices();
-        if(pairedDevices.size()>0){
-            for(BluetoothDevice device : pairedDevices){
-                mPairedDevicesArrayAdapter.add(device.getName()+"\n"
-                +device.getAddress());
-            }
-        }else{
-            String noDevices=getResources().getText(R.string.none_paired)
-                    .toString();
-            mPairedDevicesArrayAdapter.add(noDevices);
-        }
+        localBroadcastManager.registerReceiver(localReceiver,makeGattUpdateIntentFilter());
+//        Set<BluetoothDevice>pairedDevices=mBtAdapter.getBondedDevices();
+//        if(pairedDevices.size()>0){
+//            for(BluetoothDevice device : pairedDevices){
+//                mPairedDevicesArrayAdapter.add(device.getName()+"\n"
+//                +device.getAddress());
+//            }
+//        }else{
+//            String noDevices=getResources().getText(R.string.none_paired)
+//                    .toString();
+//            mPairedDevicesArrayAdapter.add(noDevices);
+//        }
     }
     @Override protected void onDestroy(){
         super.onDestroy();
-        if(mBtAdapter!=null){
-            mBtAdapter.cancelDiscovery();
-        }
-        this.unregisterReceiver(localReceiver);
+        localBroadcastManager.unregisterReceiver(localReceiver);
     }
 
-    private void doDiscovery(){
-        if(mBtAdapter.isDiscovering())
-            mBtAdapter.cancelDiscovery();
-        mBtAdapter.startDiscovery();
-    }
+
+
 
     //选项监听器
     private OnItemClickListener mDeviceClickListen=new OnItemClickListener() {
@@ -168,8 +153,7 @@ public class DeviceList extends AppCompatActivity{
                                 View view, int i, long l) {
             //mBtAdapter.cancelDiscovery();
             //停止扫描
-            mBtAdapter.stopLeScan(mLeScanCallback);
-
+            mBluetoothLeService.stopLeScan();
             String info=((TextView) view).getText().toString();
             String address=info.substring(info.length()-17);
             Intent intent =new Intent();
@@ -179,81 +163,13 @@ public class DeviceList extends AppCompatActivity{
             toast.show();
             Intent intent2 = new Intent(DeviceList.this,ChatActivity.class);
             intent2.putExtra(EXTRA_DEVICE_ADDRESS,address);
+            mBluetoothLeService.connect(address);
             startActivity(intent2);
-
-            //setResult(Activity.RESULT_OK,intent);
-            //finish();
         }
     };
 
-    private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
-        @Override public void onReceive(Context context, Intent intent) {
-            String action=intent.getAction();
-            if(BluetoothDevice.ACTION_FOUND.equals(action)){
-                BluetoothDevice  device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                if(device.getBondState() != BluetoothDevice.BOND_BONDED){
-                    mNewDevicesArrayAdapter.add(device.getName()+"\n" +
-                            device.getAddress());
-                }
-            }else if(BluetoothAdapter.ACTION_DISCOVERY_FINISHED
-                    .equals(action)){
-                progressBar.setVisibility(View.GONE);
-                Toast.makeText(DeviceList.this,"搜索完毕",Toast.LENGTH_SHORT).show();
-                if(mNewDevicesArrayAdapter.getCount()==0){
-                    String noDevices=getResources().getText(
-                            R.string.none_found).toString();
-                    mNewDevicesArrayAdapter.add(noDevices);
-                }
-            }
-        }
-    };
-
-    private void scanLeDevice(final boolean enable) {
-
-        if (enable) {//true
-            //10秒后停止搜索
-            mHandler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    mScanning = false;
-                    mBtAdapter.stopLeScan(mLeScanCallback);
-                    progressBar.setVisibility(View.GONE);
-                    scanButton.setVisibility(View.VISIBLE);
-
-                }
-            }, SCAN_PERIOD);
-            mScanning = true;
-            mBtAdapter.startLeScan(mLeScanCallback); //开始搜索
-        } else {//false
-            mScanning = false;
-            mBtAdapter.stopLeScan(mLeScanCallback);//停止搜索
-        }
-    }
-
-    private BluetoothAdapter.LeScanCallback mLeScanCallback = new BluetoothAdapter.LeScanCallback() {
-        @Override
-        public void onLeScan(final BluetoothDevice device, int rssi, byte[] scanRecord) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    Log.d(TAG,"扫描中");
-                    if(!device_list.contains(device.getName()+"\n" +
-                            device.getAddress())) {
-                        device_list.add(device.getName()+"\n" +
-                                device.getAddress());
-                    }
-                    //data[1]="3";
-                    mNewDevicesArrayAdapter.notifyDataSetChanged();
 
 
-                    //在这里可以把搜索到的设备保存起来
-                    //device.getName();获取蓝牙设备名字
-                    //device.getAddress();获取蓝牙设备mac地址
-                    //这里的rssi即信号强度，即手机与设备之间的信号强度。
-                }
-            });
-        }
-    };
 
     //获取位置权限
     public void getBlePermissionFromSys() {
@@ -294,14 +210,17 @@ public class DeviceList extends AppCompatActivity{
     class LocalReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
-            final String action = intent.getAction();
-            Toast.makeText(DeviceList.this, "广播", Toast.LENGTH_SHORT).show();
-            switch(action){
-                case BLEService.ACTION_GET_DEVICE_NAME:
-                    Toast.makeText(DeviceList.this,intent.getStringExtra(BLEService.EXTRA_DATA),Toast.LENGTH_SHORT);
-                    break;
+            String action = intent.getAction();
+            Log.d(TAG,action);
+            //Toast.makeText(DeviceList.this, intent.getStringExtra(BLEService.EXTRA_DATA), Toast.LENGTH_SHORT).show();
+            if (action.equals(BLEService.ACTION_GET_DEVICE_NAME)){
+                device_list.add(intent.getStringExtra(BLEService.DEVICE_DATA));
+                mNewDevicesArrayAdapter.notifyDataSetChanged();
             }
-
+            if(action.equals(BLEService.ACTION_SEARCH_COMPLETED)) {
+                progressBar.setVisibility(View.GONE);
+                BLEScan.setVisibility(View.VISIBLE);
+            }
         }
     }
 
@@ -316,6 +235,18 @@ public class DeviceList extends AppCompatActivity{
         public void onServiceDisconnected(ComponentName name) {
 
         }
+    };
+
+    private static IntentFilter makeGattUpdateIntentFilter()
+    {
+        final IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(BLEService.ACTION_GATT_CONNECTED);
+        intentFilter.addAction(BLEService.ACTION_GATT_DISCONNECTED);
+        intentFilter.addAction(BLEService.ACTION_GATT_SERVICES_DISCOVERED);
+        intentFilter.addAction(BLEService.ACTION_DATA_AVAILABLE);
+        intentFilter.addAction(BLEService.ACTION_GET_DEVICE_NAME);
+        intentFilter.addAction(BLEService.ACTION_SEARCH_COMPLETED);
+        return intentFilter;
     };
 
 

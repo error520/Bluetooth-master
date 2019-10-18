@@ -8,7 +8,11 @@ import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.os.IBinder;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -44,13 +48,20 @@ public class ChatActivity extends AppCompatActivity implements View.OnClickListe
     UUID notify_UUID_chara;
     ArrayAdapter<String> chatAdapter;
     private final String TAG = "ChatActivity";
+    private BLEService mBluetoothLeService;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initView();
         final BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothAdapter = bluetoothManager.getAdapter();
-        connect(getIntent().getStringExtra("device_address"));
+        Intent BLEIntent = new Intent(this, BLEService.class);
+        bindService(BLEIntent,connection,BIND_AUTO_CREATE);
+        //Log.d("BLEService",mBluetoothLeService.toString());
+        //mBluetoothLeService.connect(getIntent().getStringExtra("device_address"));
+
+        //connect(getIntent().getStringExtra("device_address"));
 
     }
     @Override
@@ -67,7 +78,8 @@ public class ChatActivity extends AppCompatActivity implements View.OnClickListe
                 readData();
                 break;
             case R.id.btWrite:
-                writeData();
+                //writeData();
+
                 Log.d(TAG,"点击了写按钮!");
                 break;
             case R.id.btClear:
@@ -258,15 +270,15 @@ public class ChatActivity extends AppCompatActivity implements View.OnClickListe
         } else {
             int numA = Integer.parseInt(Register.getText().toString(), 16);
             int numB = Integer.parseInt(data.getText().toString(), 16);
-            byte dataA[] = intToByte2(numA);
-            byte dataB[] = intToByte2(numB);
+            byte dataA[] = util.intToByte2(numA);
+            byte dataB[] = util.intToByte2(numB);
             byte CRC[] = new byte[2];
             byte[] send = {0X05, 0X03, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00};
             send[2] = dataA[0];
             send[3] = dataA[1];
             send[4] = dataB[0];
             send[5] = dataB[1];
-            CRC = CRC16_Check(send, 6);
+            CRC = util.CRC16_Check(send, 6);
             send[6] = CRC[0];
             send[7] = CRC[1];
             try {
@@ -286,15 +298,15 @@ public class ChatActivity extends AppCompatActivity implements View.OnClickListe
         } else {
             int numA = Integer.parseInt(Register.getText().toString(), 16);
             int numB = Integer.parseInt(data.getText().toString(), 16);
-            byte dataA[] = intToByte2(numA);
-            byte dataB[] = intToByte2(numB);
+            byte dataA[] = util.intToByte2(numA);
+            byte dataB[] = util.intToByte2(numB);
             byte CRC[] = new byte[2];
             byte[] send = {0X05, 0X06, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00};
             send[2] = dataA[0];
             send[3] = dataA[1];
             send[4] = dataB[0];
             send[5] = dataB[1];
-            CRC = CRC16_Check(send, 6);
+            CRC = util.CRC16_Check(send, 6);
             send[6] = CRC[0];
             send[7] = CRC[1];
             try {
@@ -306,12 +318,7 @@ public class ChatActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    public static byte[] intToByte2(int i) {
-        byte[] targets = new byte[2];
-        targets[1] = (byte) (i & 0xFF);
-        targets[0] = (byte) (i >> 8 & 0xFF);
-        return targets;
-    }
+
     public static byte[] intToByte4(int i) {
         byte[] targets = new byte[4];
         targets[3] = (byte) (i & 0xFF);
@@ -320,32 +327,23 @@ public class ChatActivity extends AppCompatActivity implements View.OnClickListe
         targets[0] = (byte) (i >> 24 & 0xFF);
         return targets;
     }
-    //CRC校验
-    public byte[] CRC16_Check(byte Pushdata[], int length){
-            int Reg_CRC=0xffff;
-            int temp;
-            int i,j;
-            byte byteResult[]=new byte[2];
-
-            for( i = 0; i<length; i ++){
-                temp = Pushdata[i];
-                if(temp < 0) temp += 256;
-                temp &= 0xff;
-                Reg_CRC^= temp;
-
-                for (j = 0; j<8; j++){
-                    if ((Reg_CRC & 0x0001) == 0x0001)
-                        Reg_CRC=(Reg_CRC>>1)^0xA001;
-                    else
-                        Reg_CRC >>=1;
-                }
-            }
-            byteResult[0] = (byte)(Reg_CRC&0xff);  //低位
-            byteResult[1] = (byte)((Reg_CRC&0xff00)>>8);  //高位
-            return byteResult;
-    }
 
 
 
+    private ServiceConnection connection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            mBluetoothLeService = ((BLEService.localBinder) service)
+                    .getService();
+            Log.d("BLEService",mBluetoothLeService.toString());
+            mBluetoothLeService.hello();
+            Log.d("BLEService","第二个活动bind了");
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+
+        }
+    };
 
 }

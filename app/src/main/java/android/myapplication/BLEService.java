@@ -20,6 +20,7 @@ import android.support.annotation.Nullable;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.Toast;
 
@@ -40,10 +41,12 @@ public class BLEService extends Service {
     public final static String ACTION_GATT_DISCONNECTED = "com.kinco.BLEService.ACTION_GATT_DISCONNECTED";
     public final static String ACTION_GATT_SERVICES_DISCOVERED = "com.kinco.BLEService.ACTION_GATT_SERVICES_DISCOVERED";
     public final static String ACTION_DATA_AVAILABLE = "com.kinco.BLEService.ACTION_DATA_AVAILABLE";
-    public final static String ACTION_GET_DEVICE_NAME = "com.kinco.BLEService.ACTION_DEVICE_NAME";
+    public final static String ACTION_GET_DEVICE_NAME = "com.kinco.BLEService.ACTION_GET_DEVICE_NAME";
+    public final static String ACTION_SEARCH_COMPLETED = "com.kinco.BLEService.ACTION_SEARCH_COMPLETED";
     public final static String EXTRA_DATA = "com.kinco.BLEService.EXTRA_DATA";
+    public final static String DEVICE_DATA = "com.kinco.BLEService.DEVICE_DATA";
     private boolean mScanning;
-    private final IBinder mBinder = new localBinder();
+    private final  IBinder mBinder = new localBinder();
     private BluetoothGatt mBluetoothGatt;
     private List<BluetoothGattCharacteristic> gattCharacteristics;
     private List<UUID> readUuid = new ArrayList<UUID>();
@@ -76,9 +79,12 @@ public class BLEService extends Service {
         Intent intent = new Intent(action);
         localBroadcastManager.sendBroadcast(intent);
     }
+    /**
+     * 返回搜索到的设备信息
+     */
     private void broadcastUpdate(final String action, final String device){
         Intent intent = new Intent(action);
-        intent.putExtra(EXTRA_DATA,device);
+        intent.putExtra(DEVICE_DATA,device);
         localBroadcastManager.sendBroadcast(intent);
     }
     public void sendBroadcast(){
@@ -89,6 +95,7 @@ public class BLEService extends Service {
     public void scanLeDevice(final boolean enable) {
 
         if (enable) {//true
+            device_list.clear();
             //10秒后停止搜索
             mHandler.postDelayed(new Runnable() {
                 @Override
@@ -96,15 +103,20 @@ public class BLEService extends Service {
                     mScanning = false;
                     mBtAdapter.stopLeScan(mLeScanCallback);
                     Log.d(TAG,"扫描完成");
+                    broadcastUpdate(ACTION_SEARCH_COMPLETED);
 
                 }
-            }, 10);
+            }, 5000);
             mScanning = true;
             mBtAdapter.startLeScan(mLeScanCallback); //开始搜索
         } else {//false
             mScanning = false;
             mBtAdapter.stopLeScan(mLeScanCallback);//停止搜索
         }
+    }
+    public void stopLeScan(){
+        if (mScanning == true)
+            mBtAdapter.stopLeScan(mLeScanCallback);
     }
 
     private BluetoothAdapter.LeScanCallback mLeScanCallback = new BluetoothAdapter.LeScanCallback() {
@@ -116,7 +128,8 @@ public class BLEService extends Service {
                         device.getAddress());
                 broadcastUpdate(ACTION_GET_DEVICE_NAME,device.getName()+"\n" +
                         device.getAddress());
-                Log.d(TAG,device.getAddress());
+                Log.d(TAG,device.getName()+"\n" +
+                        device.getAddress());
             }
 
         }
@@ -140,7 +153,7 @@ public class BLEService extends Service {
 
         mBluetoothGatt = device.connectGatt(this, true, mBluetoothGattCallback);//真正的连接
         //这个方法需要三个参数：一个Context对象，自动连接（boolean值,表示只要BLE设备可用是否自动连接到它），和BluetoothGattCallback调用。
-        Log.d("data", "尝试新的连接.");
+        Log.d(TAG, "尝试新的连接.");
         return true;
     }
     BluetoothGattCallback mBluetoothGattCallback = new BluetoothGattCallback() {
@@ -270,11 +283,15 @@ public class BLEService extends Service {
             return BLEService.this;
         };
     }
-
+    public void hello(){
+        broadcastUpdate(ACTION_GET_DEVICE_NAME,"nihao");
+        Log.d(TAG,"hello");
+    }
     @Override
     public void onCreate() {
         super.onCreate();
         init();
+
         Log.d(TAG,"创建了服务");
     }
 
@@ -294,4 +311,54 @@ public class BLEService extends Service {
         mBluetoothGatt.close();
         mBluetoothGatt = null;
     }
+
+    //读取数据
+    private void readData(String data){
+            int numA = Integer.parseInt(data, 16);
+            int numB = Integer.parseInt(data, 16);
+            byte dataA[] = util.intToByte2(numA);
+            byte dataB[] = util.intToByte2(numB);
+            byte CRC[] = new byte[2];
+            byte[] send = {0X05, 0X03, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00};
+            send[2] = dataA[0];
+            send[3] = dataA[1];
+            send[4] = dataB[0];
+            send[5] = dataB[1];
+            CRC = util.CRC16_Check(send, 6);
+            send[6] = CRC[0];
+            send[7] = CRC[1];
+            try {
+                writeCharacteristic.setValue(send);
+                mBluetoothGatt.writeCharacteristic(writeCharacteristic);
+            } catch (Exception e) {
+                Log.d("data", e.toString());
+            }
+
+    }
+    //发送数据
+    private void writeData(String data){
+            int numA = Integer.parseInt(data, 16);
+            int numB = Integer.parseInt(data, 16);
+            byte dataA[] = util.intToByte2(numA);
+            byte dataB[] = util.intToByte2(numB);
+            byte CRC[] = new byte[2];
+            byte[] send = {0X05, 0X06, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00};
+            send[2] = dataA[0];
+            send[3] = dataA[1];
+            send[4] = dataB[0];
+            send[5] = dataB[1];
+            CRC = util.CRC16_Check(send, 6);
+            send[6] = CRC[0];
+            send[7] = CRC[1];
+            try {
+                writeCharacteristic.setValue(send);
+                mBluetoothGatt.writeCharacteristic(writeCharacteristic);
+            } catch (Exception e) {
+                Log.d("data", e.toString());
+            }
+
+    }
+
+
+
 }
