@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="Gradle: android.arch.lifecycle:runtime:1.0.0@aar">
+    <CLASSES>
+      <root url="jar://E:/WeChat/WeChat Files/wxid_diekazbjyp0321/FileStorage/File/2019-09/Bluetooth-master1/Bluetooth-master/.gradle/caches/transforms-2/files-2.1/4464663fb769105e8b28960e2589148c/runtime-1.0.0/jars/classes.jar!/" />
+      <root url="file://E:/WeChat/WeChat Files/wxid_diekazbjyp0321/FileStorage/File/2019-09/Bluetooth-master1/Bluetooth-master/.gradle/caches/transforms-2/files-2.1/4464663fb769105e8b28960e2589148c/runtime-1.0.0/res" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://E:/WeChat/WeChat Files/wxid_diekazbjyp0321/FileStorage/File/2019-09/Bluetooth-master1/Bluetooth-master/.gradle/caches/modules-2/files-2.1/android.arch.lifecycle/runtime/1.0.0/1dd0298d8c45d8dfa4d038270247327f23df7a3a/runtime-1.0.0-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>
