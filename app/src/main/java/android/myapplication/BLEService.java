@@ -1,13 +1,11 @@
 package android.myapplication;
 
-import android.app.Activity;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
@@ -16,20 +14,16 @@ import android.content.pm.PackageManager;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
-import android.support.annotation.Nullable;
 import android.support.v4.content.LocalBroadcastManager;
-import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
-import android.view.Gravity;
-import android.view.View;
 import android.widget.Toast;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
-import static android.myapplication.MainActivity.DEVICE_NAME;
-import static android.myapplication.MainActivity.REQUEST_ENABLE_BT;
 
 public class BLEService extends Service {
     private final String TAG = "BLEService";
@@ -43,15 +37,15 @@ public class BLEService extends Service {
     public final static String ACTION_DATA_AVAILABLE = "com.kinco.BLEService.ACTION_DATA_AVAILABLE";
     public final static String ACTION_GET_DEVICE_NAME = "com.kinco.BLEService.ACTION_GET_DEVICE_NAME";
     public final static String ACTION_SEARCH_COMPLETED = "com.kinco.BLEService.ACTION_SEARCH_COMPLETED";
-    public final static String EXTRA_DATA = "com.kinco.BLEService.EXTRA_DATA";
-    public final static String DEVICE_DATA = "com.kinco.BLEService.DEVICE_DATA";
+    public final static String EXTRA_MESSAGE_DATA = "com.kinco.BLEService.EXTRA_DATA";
+    public final static String EXTRA_DEVICE_DATA = "com.kinco.BLEService.DEVICE_DATA";
+    public final static String ACTION_DATA_LENGTH_FALSE = "com.kinco.BLEService.ACTION_DATA_LENGTH_FALSE";
     private boolean mScanning;
     private final  IBinder mBinder = new localBinder();
     private BluetoothGatt mBluetoothGatt;
     private List<BluetoothGattCharacteristic> gattCharacteristics;
     private List<UUID> readUuid = new ArrayList<UUID>();
     private List<UUID> writeUuid = new ArrayList<UUID>();
-    private List<UUID> writeServiceUuid = new ArrayList<UUID>();
     private List<UUID> notifyUuid = new ArrayList<UUID>();
     private UUID notify_UUID_service;
     private UUID notify_UUID_chara;
@@ -75,6 +69,9 @@ public class BLEService extends Service {
         }
         return true;
     }
+    /**
+    *发送普通带action字段的广播
+    */
     private void broadcastUpdate(final String action){
         Intent intent = new Intent(action);
         localBroadcastManager.sendBroadcast(intent);
@@ -84,19 +81,29 @@ public class BLEService extends Service {
      */
     private void broadcastUpdate(final String action, final String device){
         Intent intent = new Intent(action);
-        intent.putExtra(DEVICE_DATA,device);
+        intent.putExtra(ACTION_GET_DEVICE_NAME,device);
         localBroadcastManager.sendBroadcast(intent);
     }
-    public void sendBroadcast(){
-        Intent intent = new Intent("send a local broadcast");
-        localBroadcastManager.sendBroadcast(intent);
+    /**
+     * 接收到消息, 并传递一定信息量到前台
+     * 0是正常接收, 1是长度不正常,
+     * */
+    public void broadcastUpdate(String message,int i){
+        switch(i) {
+            case 0:{Intent intent = new Intent(ACTION_DATA_AVAILABLE);
+                    intent.putExtra(EXTRA_MESSAGE_DATA, message);
+                    localBroadcastManager.sendBroadcast(intent);}break;
+            case 1:{Intent intent = new Intent(ACTION_DATA_LENGTH_FALSE);
+                    intent.putExtra(ACTION_DATA_LENGTH_FALSE, message);
+                    localBroadcastManager.sendBroadcast(intent);}break;
+
+        }
     }
 
     public void scanLeDevice(final boolean enable) {
-
         if (enable) {//true
             device_list.clear();
-            //10秒后停止搜索
+            //5秒后停止搜索
             mHandler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
@@ -126,10 +133,11 @@ public class BLEService extends Service {
                     device.getAddress())) {
                 device_list.add(device.getName()+"\n" +
                         device.getAddress());
-                broadcastUpdate(ACTION_GET_DEVICE_NAME,device.getName()+"\n" +
-                        device.getAddress());
-                Log.d(TAG,device.getName()+"\n" +
-                        device.getAddress());
+                if(device.getName()!=null)
+                    broadcastUpdate(ACTION_GET_DEVICE_NAME,device.getName()+"\n" +
+                            device.getAddress());
+//                Log.d(TAG,device.getName()+"\n" +
+//                        device.getAddress());
             }
 
         }
@@ -157,16 +165,6 @@ public class BLEService extends Service {
         return true;
     }
     BluetoothGattCallback mBluetoothGattCallback = new BluetoothGattCallback() {
-        @Override
-        public void onPhyUpdate(BluetoothGatt gatt, int txPhy, int rxPhy, int status) {
-            super.onPhyUpdate(gatt, txPhy, rxPhy, status);
-        }
-
-        @Override
-        public void onPhyRead(BluetoothGatt gatt, int txPhy, int rxPhy, int status) {
-            super.onPhyRead(gatt, txPhy, rxPhy, status);
-        }
-
         //当连接状态发生改变(有信息来)
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
@@ -194,7 +192,6 @@ public class BLEService extends Service {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 //得到所有Service
                 List<BluetoothGattService> supportedGattServices = gatt.getServices();
-
                 for (BluetoothGattService gattService : supportedGattServices) {
                     //得到每个Service的Characteristics
                     gattCharacteristics = gattService.getCharacteristics();
@@ -210,7 +207,6 @@ public class BLEService extends Service {
                         if ((charaProp | BluetoothGattCharacteristic.PROPERTY_WRITE) > 0) {
                             Log.d(TAG, "gattCharacteristic的UUID为:" + gattCharacteristic.getUuid());
                             Log.d(TAG, "gattCharacteristic的属性为:  可写");
-                            writeServiceUuid.add(gattService.getUuid());
                             writeUuid.add(gattCharacteristic.getUuid());
                             writeCharacteristic = gattCharacteristic;
                         }
@@ -234,8 +230,6 @@ public class BLEService extends Service {
         @Override
         public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             super.onCharacteristicRead(gatt, characteristic, status);
-//            byte bb[] = characteristic.getValue();
-//            Log.d(TAG, toHexString(bb));
         }
 
         //发送数据后的回调
@@ -248,23 +242,16 @@ public class BLEService extends Service {
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             super.onCharacteristicChanged(gatt, characteristic);
-            final byte bb2[] = characteristic.getValue();
+            byte bb2[] = characteristic.getValue();
+            Log.d(TAG, util.toHexString(bb2));
+            if((bb2.length==5)||(bb2.length==8)||(bb2.length==7)) {
+                broadcastUpdate(util.toHexString(bb2),0);//收到的消息进行广播
+            }
+            else
+                Log.e(TAG,"长度错误!当前长度为"+bb2.length+"");
+                broadcastUpdate(bb2.length+"",1);
 
-
-            Log.d(TAG, control_Activity.toHexString(bb2));
         }
-
-        @Override
-        public void onDescriptorRead(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {//descriptor读
-            super.onDescriptorRead(gatt, descriptor, status);
-        }
-
-        @Override
-        public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {//descriptor写
-            super.onDescriptorWrite(gatt, descriptor, status);
-        }
-
-
 
         //调用mBluetoothGatt.readRemoteRssi()时的回调，rssi即信号强度
         @Override
@@ -272,10 +259,6 @@ public class BLEService extends Service {
             super.onReadRemoteRssi(gatt, rssi, status);
         }
 
-        @Override
-        public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
-            super.onMtuChanged(gatt, mtu, status);
-        }
     };
 
     class localBinder extends Binder {
@@ -291,7 +274,6 @@ public class BLEService extends Service {
     public void onCreate() {
         super.onCreate();
         init();
-
         Log.d(TAG,"创建了服务");
     }
 
@@ -299,6 +281,7 @@ public class BLEService extends Service {
     public IBinder onBind(Intent intent) {
         return mBinder;
     }
+
     @Override
     public boolean onUnbind(Intent intent) {
         close();
@@ -313,50 +296,36 @@ public class BLEService extends Service {
     }
 
     //读取数据
-    public void readData(String data){
-            int numA = Integer.parseInt(data, 16);
-            int numB = Integer.parseInt(data, 16);
-            byte dataA[] = util.intToByte2(numA);
-            byte dataB[] = util.intToByte2(numB);
-            byte CRC[] = new byte[2];
-            byte[] send = {0X05, 0X03, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00};
-            send[2] = dataA[0];
-            send[3] = dataA[1];
-            send[4] = dataB[0];
-            send[5] = dataB[1];
-            CRC = util.CRC16_Check(send, 6);
-            send[6] = CRC[0];
-            send[7] = CRC[1];
-            try {
-                writeCharacteristic.setValue(send);
-                mBluetoothGatt.writeCharacteristic(writeCharacteristic);
-            } catch (Exception e) {
-                Log.d("data", e.toString());
-            }
-
+    public void readData(String data1, String data2){
+           sendDataPackage(data1,data2,true);
     }
     //发送数据
     public void writeData(String data1,String data2){
-            int numA = Integer.parseInt(data1, 16);
-            int numB = Integer.parseInt(data2, 16);
-            byte dataA[] = util.intToByte2(numA);
-            byte dataB[] = util.intToByte2(numB);
-            byte CRC[] = new byte[2];
-            byte[] send = {0X05, 0X06, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00};
-            send[2] = dataA[0];
-            send[3] = dataA[1];
-            send[4] = dataB[0];
-            send[5] = dataB[1];
-            CRC = util.CRC16_Check(send, 6);
-            send[6] = CRC[0];
-            send[7] = CRC[1];
-            try {
-                writeCharacteristic.setValue(send);
-                mBluetoothGatt.writeCharacteristic(writeCharacteristic);
-            } catch (Exception e) {
-                Log.d("data", e.toString());
-            }
+            sendDataPackage(data1,data2,false);
+    }
 
+    //生成数据包, true为读取数据, false为写数据
+    private void sendDataPackage(String data1, String data2, boolean mode){
+        int numA = Integer.parseInt(data1, 16);
+        int numB = Integer.parseInt(data2, 16);
+        byte dataA[] = util.intToByte2(numA);
+        byte dataB[] = util.intToByte2(numB);
+        byte CRC[] = new byte[2];
+        byte send[] = {0X05, 0X06, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00};
+        if(mode)    send[1] = 0x03;
+        send[2] = dataA[0];
+        send[3] = dataA[1];
+        send[4] = dataB[0];
+        send[5] = dataB[1];
+        CRC = util.CRC16_Check(send, 6);
+        send[6] = CRC[0];
+        send[7] = CRC[1];
+        try {
+            writeCharacteristic.setValue(send);
+            mBluetoothGatt.writeCharacteristic(writeCharacteristic);
+        } catch (Exception e) {
+            Log.d("data", e.toString());
+        }
     }
 
 

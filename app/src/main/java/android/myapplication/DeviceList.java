@@ -125,7 +125,7 @@ public class DeviceList extends AppCompatActivity{
         mHandler = new Handler();
         localReceiver = new LocalReceiver();
         localBroadcastManager = LocalBroadcastManager.getInstance(this);
-        localBroadcastManager.registerReceiver(localReceiver,makeGattUpdateIntentFilter());
+        localBroadcastManager.registerReceiver(localReceiver,util.makeGattUpdateIntentFilter());
 //        Set<BluetoothDevice>pairedDevices=mBtAdapter.getBondedDevices();
 //        if(pairedDevices.size()>0){
 //            for(BluetoothDevice device : pairedDevices){
@@ -207,17 +207,17 @@ public class DeviceList extends AppCompatActivity{
         }
     }
 
-    class LocalReceiver extends BroadcastReceiver {
+    private class LocalReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             Log.d(TAG,action);
             //Toast.makeText(DeviceList.this, intent.getStringExtra(BLEService.EXTRA_DATA), Toast.LENGTH_SHORT).show();
             if (action.equals(BLEService.ACTION_GET_DEVICE_NAME)){
-                device_list.add(intent.getStringExtra(BLEService.DEVICE_DATA));
+                device_list.add(intent.getStringExtra(BLEService.ACTION_GET_DEVICE_NAME));
                 mNewDevicesArrayAdapter.notifyDataSetChanged();
             }
-            if(action.equals(BLEService.ACTION_SEARCH_COMPLETED)) {
+            else if(action.equals(BLEService.ACTION_SEARCH_COMPLETED)) {
                 progressBar.setVisibility(View.GONE);
                 BLEScan.setVisibility(View.VISIBLE);
             }
@@ -237,17 +237,7 @@ public class DeviceList extends AppCompatActivity{
         }
     };
 
-    private static IntentFilter makeGattUpdateIntentFilter()
-    {
-        final IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(BLEService.ACTION_GATT_CONNECTED);
-        intentFilter.addAction(BLEService.ACTION_GATT_DISCONNECTED);
-        intentFilter.addAction(BLEService.ACTION_GATT_SERVICES_DISCOVERED);
-        intentFilter.addAction(BLEService.ACTION_DATA_AVAILABLE);
-        intentFilter.addAction(BLEService.ACTION_GET_DEVICE_NAME);
-        intentFilter.addAction(BLEService.ACTION_SEARCH_COMPLETED);
-        return intentFilter;
-    };
+
 
 
 
