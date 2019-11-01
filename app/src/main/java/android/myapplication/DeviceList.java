@@ -45,7 +45,7 @@ import android.widget.AdapterView.OnItemClickListener;
 import android.widget.Toast;
 
 import static android.myapplication.MainActivity.REQUEST_ENABLE_BT;
-
+//远程推送
 /**
  * Created by Excalibur on 2017/6/1.
  * 用于显示蓝牙设备列表，并返回蓝牙设备信息
